@@ -39,49 +39,58 @@ export const useBluetooth = () => {
 
       const devices: BluetoothDevice[] = [];
 
-      // Start scanning for devices
+      // Start scanning for ALL nearby devices (no service filter)
       await BleClient.requestLEScan(
         {
-          services: [HC05_SERVICE_UUID], // Look for HC-05 devices
           allowDuplicates: false
         },
         (result: ScanResult) => {
+          const deviceName = result.device.name || result.localName || `Device-${result.device.deviceId.slice(-4)}`;
+          
           const device: BluetoothDevice = {
             deviceId: result.device.deviceId,
-            name: result.device.name || result.localName || 'Unknown Device',
+            name: deviceName,
             rssi: result.rssi,
             isConnected: false
           };
           
-          // Only add HC-05 or devices with "bell" in the name
-          if (device.name.toLowerCase().includes('hc-05') || 
-              device.name.toLowerCase().includes('bell') ||
-              device.name.toLowerCase().includes('school')) {
+          // Add all discovered devices - let user choose
+          const existingIndex = devices.findIndex(d => d.deviceId === device.deviceId);
+          if (existingIndex === -1) {
             devices.push(device);
             setAvailableDevices([...devices]);
+            console.log('Found device:', deviceName, 'RSSI:', result.rssi);
           }
         }
       );
 
-      // Stop scanning after 10 seconds
+      // Stop scanning after 15 seconds
       setTimeout(async () => {
         await BleClient.stopLEScan();
         setIsScanning(false);
         
+        console.log(`Scan completed. Found ${devices.length} devices`);
+        
         if (devices.length === 0) {
           toast({
-            title: "No Devices Found",
-            description: "No HC-05 bell controllers found. Make sure your device is paired and nearby.",
+            title: "No Devices Found", 
+            description: "No Bluetooth devices discovered. Make sure devices are discoverable and nearby.",
             variant: "destructive"
           });
+        } else {
+          toast({
+            title: "Scan Complete",
+            description: `Found ${devices.length} Bluetooth devices`,
+            variant: "default"
+          });
         }
-      }, 10000);
+      }, 15000);
 
     } catch (error) {
       console.error('Error scanning for devices:', error);
       toast({
         title: "Scan Failed",
-        description: "Could not scan for Bluetooth devices. Make sure Bluetooth is enabled.",
+        description: `Bluetooth scan failed: ${error}. Make sure Bluetooth is enabled and permissions granted.`,
         variant: "destructive"
       });
       setIsScanning(false);
