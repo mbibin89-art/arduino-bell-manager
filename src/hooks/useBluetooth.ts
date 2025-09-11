@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BluetoothDevice } from '@/types/bell';
 import { toast } from '@/components/ui/use-toast';
 import { BleClient, BleDevice, ScanResult } from '@capacitor-community/bluetooth-le';
+import { Capacitor } from '@capacitor/core';
 
 export const useBluetooth = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -31,6 +32,19 @@ export const useBluetooth = () => {
       setIsScanning(true);
       setAvailableDevices([]);
 
+      // Check if running on native platform
+      if (!Capacitor.isNativePlatform()) {
+        toast({
+          title: "Mobile App Required",
+          description: "Bluetooth scanning requires the app to run on a mobile device. Export to GitHub and build for Android/iOS to test real Bluetooth functionality.",
+          variant: "destructive"
+        });
+        setIsScanning(false);
+        return;
+      }
+
+      console.log('Starting Bluetooth scan for HC-05 devices...');
+
       // Request Bluetooth permissions
       const hasPermission = await BleClient.isEnabled();
       if (!hasPermission) {
@@ -54,12 +68,19 @@ export const useBluetooth = () => {
             isConnected: false
           };
           
-          // Add all discovered devices - let user choose
+          // Prioritize HC-05 devices but show all for selection
           const existingIndex = devices.findIndex(d => d.deviceId === device.deviceId);
           if (existingIndex === -1) {
-            devices.push(device);
+            // Add HC-05 devices to the front of the list
+            if (deviceName.toLowerCase().includes('hc-05') || 
+                deviceName.toLowerCase().includes('hc05') ||
+                deviceName.toLowerCase().includes('bell')) {
+              devices.unshift(device);
+            } else {
+              devices.push(device);
+            }
             setAvailableDevices([...devices]);
-            console.log('Found device:', deviceName, 'RSSI:', result.rssi);
+            console.log('Found device:', deviceName, 'RSSI:', result.rssi, 'ID:', result.device.deviceId);
           }
         }
       );
