@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Plus, Edit, Trash2, Send } from 'lucide-react';
+import { Bell, Plus, Edit, Trash2, Send, Smartphone } from 'lucide-react';
 import { BellSchedule } from '@/types/bell';
 import { useBluetooth } from '@/hooks/useBluetooth';
 import { toast } from '@/components/ui/use-toast';
+import { Capacitor } from '@capacitor/core';
 
 export const ScheduleManager = () => {
   const [schedules, setSchedules] = useState<BellSchedule[]>([]);
@@ -174,12 +175,22 @@ export const ScheduleManager = () => {
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              {!Capacitor.isNativePlatform() && (
+                <div className="flex items-center gap-2 mr-4 px-3 py-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <Smartphone className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  <span className="text-sm text-orange-700 dark:text-orange-300 font-medium">
+                    Web Preview Mode
+                  </span>
+                </div>
+              )}
               <Button 
                 onClick={sendToArduino}
-                disabled={!isConnected || schedules.filter(s => s.isActive).length === 0}
+                disabled={!Capacitor.isNativePlatform() || !isConnected || schedules.filter(s => s.isActive).length === 0}
                 className="shadow-button"
                 title={
-                  !isConnected 
+                  !Capacitor.isNativePlatform()
+                    ? "Build mobile app to enable Bluetooth communication"
+                    : !isConnected 
                     ? "Connect to Bluetooth device first" 
                     : schedules.filter(s => s.isActive).length === 0 
                     ? "Add and activate at least one schedule" 

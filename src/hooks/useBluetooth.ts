@@ -252,8 +252,20 @@ export const useBluetooth = () => {
     console.log('sendScheduleData called:', {
       isConnected,
       connectedDeviceId,
-      schedulesCount: schedules.length
+      schedulesCount: schedules.length,
+      isNativePlatform: Capacitor.isNativePlatform()
     });
+
+    // Check if running on native platform
+    if (!Capacitor.isNativePlatform()) {
+      console.log('Send failed: Not running on native platform');
+      toast({
+        title: "Mobile App Required",
+        description: "Bluetooth communication requires the app to run on a mobile device. Export to GitHub and build for Android/iOS to test real Bluetooth functionality.",
+        variant: "destructive"
+      });
+      return false;
+    }
     
     if (!isConnected || !connectedDeviceId) {
       console.log('Connection check failed:', { isConnected, connectedDeviceId });
