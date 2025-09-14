@@ -249,6 +249,7 @@ export const useBluetooth = () => {
   };
 
   const sendScheduleData = async (schedules: any[]) => {
+    console.log('=== MOBILE SEND SCHEDULE DATA START ===');
     console.log('sendScheduleData called:', {
       isConnected,
       connectedDeviceId,
@@ -278,6 +279,7 @@ export const useBluetooth = () => {
     }
 
     try {
+      console.log('Formatting data for Arduino...');
       // Format data for Arduino
       const scheduleData = {
         type: 'schedules',
@@ -293,14 +295,23 @@ export const useBluetooth = () => {
       };
 
       const jsonData = JSON.stringify(scheduleData);
-      console.log('Sending schedule data:', jsonData);
+      console.log('JSON data to send:', jsonData);
+      console.log('JSON data length:', jsonData.length);
 
       // Try Bluetooth Classic first (for HC-05)
+      console.log('Attempting Bluetooth Classic transmission...');
       try {
+        console.log('Calling BluetoothSerial.write with:', {
+          address: connectedDeviceId,
+          dataLength: jsonData.length + 1
+        });
+        
         await BluetoothSerial.write({ 
           address: connectedDeviceId, 
           value: jsonData + '\n' 
         });
+        
+        console.log('SUCCESS: Bluetooth Classic transmission completed');
         
         toast({
           title: "Data Sent (Classic)",
@@ -308,15 +319,29 @@ export const useBluetooth = () => {
         });
         
         console.log('Schedule data sent successfully via Bluetooth Classic');
+        console.log('=== MOBILE SEND SCHEDULE DATA END (SUCCESS) ===');
         return true;
       } catch (classicError) {
-        console.log('Classic data send failed, trying BLE...', classicError);
+        console.log('Bluetooth Classic send failed:', classicError);
+        console.log('Error details:', {
+          name: classicError.name,
+          message: classicError.message,
+          stack: classicError.stack
+        });
       }
 
       // If Classic fails, try BLE
+      console.log('Attempting BLE transmission as fallback...');
       try {
         const CHARACTERISTIC_UUID = '0000fff1-0000-1000-8000-00805f9b34fb';
         const dataBytes = new TextEncoder().encode(jsonData + '\n');
+        
+        console.log('BLE write parameters:', {
+          deviceId: connectedDeviceId,
+          serviceUUID: HC05_SERVICE_UUID,
+          characteristicUUID: CHARACTERISTIC_UUID,
+          dataLength: dataBytes.length
+        });
         
         await BleClient.write(
           connectedDeviceId,
@@ -325,22 +350,38 @@ export const useBluetooth = () => {
           new DataView(dataBytes.buffer)
         );
 
+        console.log('SUCCESS: BLE transmission completed');
+        
         toast({
           title: "Data Sent (BLE)",
           description: `Schedule data sent to ${connectedDevice?.name} via Bluetooth LE`,
         });
 
         console.log('Schedule data sent successfully via BLE');
+        console.log('=== MOBILE SEND SCHEDULE DATA END (SUCCESS) ===');
         return true;
       } catch (bleError) {
+        console.log('BLE transmission also failed:', bleError);
+        console.log('BLE Error details:', {
+          name: bleError.name,
+          message: bleError.message,
+          stack: bleError.stack
+        });
         throw new Error('Both Bluetooth Classic and BLE data transmission failed');
       }
 
     } catch (error) {
-      console.error('Failed to send schedule data:', error);
+      console.error('FINAL ERROR in sendScheduleData:', error);
+      console.log('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      console.log('=== MOBILE SEND SCHEDULE DATA END (FAILED) ===');
+      
       toast({
         title: "Send Failed",
-        description: "Failed to send schedule data to the device",
+        description: `Failed to send schedule data: ${error.message}`,
         variant: "destructive"
       });
       return false;

@@ -52,6 +52,10 @@ void setup() {
   Serial.begin(9600);
   bluetooth.begin(9600);
   
+  Serial.println("=== SCHOOL BELL CONTROLLER STARTUP ===");
+  Serial.println("Serial communication initialized at 9600 baud");
+  Serial.println("Bluetooth HC-05 initialized at 9600 baud");
+  
   // Initialize LCD
   lcd.init();
   lcd.backlight();
@@ -60,13 +64,18 @@ void setup() {
   lcd.setCursor(0, 1);
   lcd.print("Initializing...");
   
+  Serial.println("LCD initialized and backlight on");
+  
   // Initialize RTC
   if (!rtc.begin()) {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("RTC ERROR!");
+    Serial.println("ERROR: RTC initialization failed!");
     while (1);
   }
+  
+  Serial.println("RTC initialized successfully");
   
   // Set RTC time if needed (uncomment and set once)
   // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -74,6 +83,7 @@ void setup() {
   // Initialize bell pin
   pinMode(BELL_PIN, OUTPUT);
   digitalWrite(BELL_PIN, LOW);
+  Serial.println("Bell pin initialized (Pin 4)");
   
   // Load schedules from EEPROM
   loadSchedulesFromEEPROM();
@@ -81,13 +91,17 @@ void setup() {
   delay(2000);
   lcd.clear();
   
+  Serial.println("=== INITIALIZATION COMPLETE ===");
   Serial.println("School Bell Controller Ready");
+  Serial.println("Waiting for Bluetooth commands...");
+  Serial.println("Bluetooth Status: Ready to receive");
   bluetooth.println("School Bell Controller Ready");
 }
 
 void loop() {
   // Handle Bluetooth communication
   if (bluetooth.available()) {
+    Serial.println(">>> Bluetooth data available! <<<");
     handleBluetoothData();
   }
   
@@ -115,47 +129,128 @@ void loop() {
 }
 
 void handleBluetoothData() {
+  Serial.println("=== BLUETOOTH DATA HANDLER START ===");
+  
   String jsonData = bluetooth.readString();
   jsonData.trim();
   
-  if (jsonData.length() == 0) return;
+  Serial.print("Raw data received: ");
+  Serial.println(jsonData);
+  Serial.print("Data length: ");
+  Serial.println(jsonData.length());
   
-  Serial.println("Received: " + jsonData);
+  if (jsonData.length() == 0) {
+    Serial.println("WARNING: Empty data received, ignoring");
+    return;
+  }
+  
+  Serial.println("Processing JSON data...");
   
   // Parse JSON
   StaticJsonDocument<2048> doc;
   DeserializationError error = deserializeJson(doc, jsonData);
   
   if (error) {
-    Serial.println("JSON Parse Error: " + String(error.c_str()));
-    bluetooth.println("ERROR: Invalid JSON");
+    Serial.print("ERROR: JSON Parse failed - ");
+    Serial.println(error.c_str());
+    bluetooth.println("ERROR: Invalid JSON format");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("JSON ERROR!");
+    lcd.setCursor(0, 1);
+    lcd.print("Check data format");
+    delay(2000);
     return;
   }
   
+  Serial.println("SUCCESS: JSON parsed successfully");
+  
   // Handle different command types
-  if (doc.containsKey("schedules")) {
+  if (doc.containsKey("type")) {
+    String dataType = doc["type"];
+    Serial.print("Data type detected: ");
+    Serial.println(dataType);
+    
+    if (dataType == "schedules" && doc.containsKey("data")) {
+      Serial.println("Processing schedule data...");
+      handleScheduleUpdate(doc["data"]);
+    } else {
+      Serial.println("ERROR: Invalid schedule data format");
+      bluetooth.println("ERROR: Expected schedules data");
+    }
+  } else if (doc.containsKey("schedules")) {
+    Serial.println("Processing legacy schedule format...");
     handleScheduleUpdate(doc["schedules"]);
   } else if (doc.containsKey("holidays")) {
+    Serial.println("Processing holiday data...");
     handleHolidayUpdate(doc["holidays"]);
   } else if (doc.containsKey("command")) {
-    handleCommand(doc["command"]);
+    String cmd = doc["command"];
+    Serial.print("Processing command: ");
+    Serial.println(cmd);
+    handleCommand(cmd);
+  } else {
+    Serial.println("ERROR: Unknown data format received");
+    bluetooth.println("ERROR: Unknown command type");
   }
+  
+  Serial.println("=== BLUETOOTH DATA HANDLER END ===");
 }
 
 void handleScheduleUpdate(JsonArray schedulesArray) {
+  Serial.println("=== SCHEDULE UPDATE START ===");
+  Serial.print("Received array with ");
+  Serial.print(schedulesArray.size());
+  Serial.println(" schedules");
+  
   scheduleCount = 0;
   
   for (JsonObject schedule : schedulesArray) {
-    if (scheduleCount >= MAX_SCHEDULES) break;
+    if (scheduleCount >= MAX_SCHEDULES) {
+      Serial.println("WARNING: Maximum schedule limit reached");
+      break;
+    }
+    
+    Serial.print("Processing schedule #");
+    Serial.println(scheduleCount + 1);
+    
+    // Debug: Print all keys in the schedule object
+    Serial.print("Schedule keys: ");
+    for (JsonPair kv : schedule) {
+      Serial.print(kv.key().c_str());
+      Serial.print("=");
+      Serial.print(kv.value().as<String>());
+      Serial.print(" ");
+    }
+    Serial.println();
     
     String timeStr = schedule["time"];
     String dateStr = schedule["date"];
     bool active = schedule["active"];
     
+    Serial.print("Time: ");
+    Serial.print(timeStr);
+    Serial.print(", Date: ");
+    Serial.print(dateStr);
+    Serial.print(", Active: ");
+    Serial.println(active);
+    
+    if (timeStr.length() < 8) {
+      Serial.println("ERROR: Invalid time format, skipping this schedule");
+      continue;
+    }
+    
     // Parse time (HH:MM:SS)
     int hour = timeStr.substring(0, 2).toInt();
     int minute = timeStr.substring(3, 5).toInt();
     int second = timeStr.substring(6, 8).toInt();
+    
+    Serial.print("Parsed time: ");
+    Serial.print(hour);
+    Serial.print(":");
+    Serial.print(minute);
+    Serial.print(":");
+    Serial.println(second);
     
     schedules[scheduleCount].hour = hour;
     schedules[scheduleCount].minute = minute;
@@ -164,21 +259,40 @@ void handleScheduleUpdate(JsonArray schedulesArray) {
     
     // Parse date if provided
     if (dateStr.length() > 0) {
-      schedules[scheduleCount].year = dateStr.substring(0, 4).toInt();
-      schedules[scheduleCount].month = dateStr.substring(5, 7).toInt();
-      schedules[scheduleCount].day = dateStr.substring(8, 10).toInt();
+      int year = dateStr.substring(0, 4).toInt();
+      int month = dateStr.substring(5, 7).toInt();
+      int day = dateStr.substring(8, 10).toInt();
+      
+      schedules[scheduleCount].year = year;
+      schedules[scheduleCount].month = month;
+      schedules[scheduleCount].day = day;
       schedules[scheduleCount].isRecurring = false;
+      
+      Serial.print("Parsed date: ");
+      Serial.print(year);
+      Serial.print("-");
+      Serial.print(month);
+      Serial.print("-");
+      Serial.println(day);
     } else {
       schedules[scheduleCount].isRecurring = true;
+      Serial.println("Schedule set as recurring (daily)");
     }
     
     scheduleCount++;
+    Serial.println("Schedule added successfully");
   }
   
   saveSchedulesToEEPROM();
   
-  Serial.println("Schedules updated: " + String(scheduleCount));
-  bluetooth.println("OK: " + String(scheduleCount) + " schedules saved");
+  Serial.print("TOTAL SCHEDULES SAVED: ");
+  Serial.println(scheduleCount);
+  Serial.println("=== SCHEDULE UPDATE COMPLETE ===");
+  
+  String response = "OK: " + String(scheduleCount) + " schedules saved";
+  bluetooth.println(response);
+  Serial.print("Response sent: ");
+  Serial.println(response);
   
   // Brief confirmation on LCD
   lcd.clear();

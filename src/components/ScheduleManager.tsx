@@ -16,7 +16,7 @@ export const ScheduleManager = () => {
   const [schedules, setSchedules] = useState<BellSchedule[]>([]);
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
-  const { sendScheduleData, isConnected } = useBluetooth();
+  const { sendScheduleData, isConnected, connectedDevice } = useBluetooth();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -110,13 +110,30 @@ export const ScheduleManager = () => {
 
   const sendToArduino = async () => {
     const activeSchedules = schedules.filter(s => s.isActive);
+    
+    console.log('=== SEND TO ARDUINO DEBUG ===');
     console.log('Attempting to send schedules:', {
       isConnected,
+      connectedDeviceId: connectedDevice?.deviceId,
+      connectedDeviceName: connectedDevice?.name,
       activeSchedulesCount: activeSchedules.length,
-      activeSchedules
+      activeSchedules,
+      isNativePlatform: Capacitor.isNativePlatform(),
+      buttonShouldBeEnabled: Capacitor.isNativePlatform() && isConnected && activeSchedules.length > 0
     });
     
+    if (!Capacitor.isNativePlatform()) {
+      console.log('Send failed: Not running on native platform');
+      toast({
+        title: "Mobile App Required",
+        description: "Bluetooth communication requires the app to run on a mobile device.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (!isConnected) {
+      console.log('Send failed: Not connected to Bluetooth device');
       toast({
         title: "Not Connected",
         description: "Please connect to the HC-05 device first in the Bluetooth tab",
@@ -126,6 +143,7 @@ export const ScheduleManager = () => {
     }
     
     if (activeSchedules.length === 0) {
+      console.log('Send failed: No active schedules');
       toast({
         title: "No Active Schedules",
         description: "Please add and activate at least one schedule first",
@@ -134,7 +152,9 @@ export const ScheduleManager = () => {
       return;
     }
     
+    console.log('All checks passed, calling sendScheduleData...');
     const success = await sendScheduleData(activeSchedules);
+    console.log('sendScheduleData result:', success);
     
     if (success) {
       toast({
@@ -142,6 +162,7 @@ export const ScheduleManager = () => {
         description: `Sent ${activeSchedules.length} schedules to bell controller`,
       });
     }
+    console.log('=== SEND TO ARDUINO END ===');
   };
 
   const getIntervalColor = (type: BellSchedule['intervalType']) => {
