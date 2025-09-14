@@ -249,7 +249,14 @@ export const useBluetooth = () => {
   };
 
   const sendScheduleData = async (schedules: any[]) => {
+    console.log('sendScheduleData called:', {
+      isConnected,
+      connectedDeviceId,
+      schedulesCount: schedules.length
+    });
+    
     if (!isConnected || !connectedDeviceId) {
+      console.log('Connection check failed:', { isConnected, connectedDeviceId });
       toast({
         title: "Not Connected",
         description: "Please connect to bell controller first",

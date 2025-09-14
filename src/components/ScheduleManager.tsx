@@ -109,6 +109,30 @@ export const ScheduleManager = () => {
 
   const sendToArduino = async () => {
     const activeSchedules = schedules.filter(s => s.isActive);
+    console.log('Attempting to send schedules:', {
+      isConnected,
+      activeSchedulesCount: activeSchedules.length,
+      activeSchedules
+    });
+    
+    if (!isConnected) {
+      toast({
+        title: "Not Connected",
+        description: "Please connect to the HC-05 device first in the Bluetooth tab",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (activeSchedules.length === 0) {
+      toast({
+        title: "No Active Schedules",
+        description: "Please add and activate at least one schedule first",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const success = await sendScheduleData(activeSchedules);
     
     if (success) {
@@ -154,9 +178,16 @@ export const ScheduleManager = () => {
                 onClick={sendToArduino}
                 disabled={!isConnected || schedules.filter(s => s.isActive).length === 0}
                 className="shadow-button"
+                title={
+                  !isConnected 
+                    ? "Connect to Bluetooth device first" 
+                    : schedules.filter(s => s.isActive).length === 0 
+                    ? "Add and activate at least one schedule" 
+                    : "Send schedules to controller"
+                }
               >
                 <Send className="h-4 w-4 mr-2" />
-                Send to Controller
+                Send to Controller ({schedules.filter(s => s.isActive).length})
               </Button>
               <Button 
                 onClick={() => setIsAddingSchedule(true)}
