@@ -258,16 +258,8 @@ export const useBluetooth = () => {
       isNativePlatform: Capacitor.isNativePlatform()
     });
 
-    // FORCE ENABLE FOR DEBUGGING - Remove platform check temporarily
-    if (!Capacitor.isNativePlatform()) {
-      console.log('Send failed: Not running on native platform');
-      toast({
-        title: "Mobile App Required",
-        description: "Bluetooth communication requires the app to run on a mobile device. Export to GitHub and build for Android/iOS to test real Bluetooth functionality.",
-        variant: "destructive"
-      });
-      return false;
-    }
+    // Platform check removed - allow transmission on all platforms for testing
+    console.log('Platform check bypassed - proceeding with data transmission');
     
     if (!isConnected || !connectedDeviceId) {
       console.log('Connection check failed:', { isConnected, connectedDeviceId });

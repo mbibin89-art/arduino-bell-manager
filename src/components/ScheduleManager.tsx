@@ -122,15 +122,8 @@ export const ScheduleManager = () => {
       buttonShouldBeEnabled: Capacitor.isNativePlatform() && isConnected && activeSchedules.length > 0
     });
     
-    if (!Capacitor.isNativePlatform()) {
-      console.log('Send failed: Not running on native platform');
-      toast({
-        title: "Mobile App Required",
-        description: "Bluetooth communication requires the app to run on a mobile device.",
-        variant: "destructive"
-      });
-      return;
-    }
+    // Platform check removed for real device testing
+    console.log('Platform check bypassed in ScheduleManager');
     
     if (!isConnected) {
       console.log('Send failed: Not connected to Bluetooth device');
