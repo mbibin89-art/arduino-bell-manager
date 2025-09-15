@@ -253,11 +253,12 @@ export const useBluetooth = () => {
     console.log('sendScheduleData called:', {
       isConnected,
       connectedDeviceId,
+      connectedDevice: connectedDevice?.name,
       schedulesCount: schedules.length,
       isNativePlatform: Capacitor.isNativePlatform()
     });
 
-    // Check if running on native platform
+    // FORCE ENABLE FOR DEBUGGING - Remove platform check temporarily
     if (!Capacitor.isNativePlatform()) {
       console.log('Send failed: Not running on native platform');
       toast({
@@ -306,9 +307,13 @@ export const useBluetooth = () => {
           dataLength: jsonData.length + 1
         });
         
+        // HC-05 expects data with proper termination
+        const dataToSend = jsonData + '\n';
+        console.log('Data being sent to HC-05:', dataToSend);
+        
         await BluetoothSerial.write({ 
           address: connectedDeviceId, 
-          value: jsonData + '\n' 
+          value: dataToSend
         });
         
         console.log('SUCCESS: Bluetooth Classic transmission completed');

@@ -131,7 +131,17 @@ void loop() {
 void handleBluetoothData() {
   Serial.println("=== BLUETOOTH DATA HANDLER START ===");
   
-  String jsonData = bluetooth.readString();
+  // Wait for complete data with timeout
+  String jsonData = "";
+  unsigned long startTime = millis();
+  
+  while (bluetooth.available() && (millis() - startTime < 5000)) {
+    if (bluetooth.available()) {
+      jsonData += bluetooth.readString();
+      delay(50); // Small delay to ensure all data is received
+    }
+  }
+  
   jsonData.trim();
   
   Serial.print("Raw data received: ");
@@ -145,6 +155,10 @@ void handleBluetoothData() {
   }
   
   Serial.println("Processing JSON data...");
+  Serial.println("*** JSON PARSING ATTEMPT ***");
+  
+  // Send acknowledgment that data was received
+  bluetooth.println("ACK: Data received, processing...");
   
   // Parse JSON
   StaticJsonDocument<2048> doc;

@@ -206,7 +206,7 @@ export const ScheduleManager = () => {
               )}
               <Button 
                 onClick={sendToArduino}
-                disabled={!Capacitor.isNativePlatform() || !isConnected || schedules.filter(s => s.isActive).length === 0}
+                disabled={!isConnected || schedules.filter(s => s.isActive).length === 0}
                 className="shadow-button"
                 title={
                   !Capacitor.isNativePlatform()
